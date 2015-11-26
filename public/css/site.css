@@ -1,0 +1,18 @@
+.modal-backdrop,.modal-backdrop.fade.in{opacity:0.5;filter:alpha(opacity=50)}
+ul.chzn-choices{background:#fff url('/img/dropdown.png') right top no-repeat}
+#controlform{margin-bottom:5px}
+#nickname{width:130px}
+#controlbuttons{float:right;margin-bottom:10px}
+#msgcontainer{overflow-y:scroll}
+#msgcontainer ul{margin:0 0 10px 0}
+#messages li{padding:5px 10px}
+#messages li:nth-child(odd){background:#eee}
+#messages li .user{font-size:12px;color:grey}
+#messages li .user a{font-size:12px;color:grey}
+#messages li .msgline{vertical-align:top;width:15px;font-size:12px;color:grey}
+#messages li .msg{font-size:14px}
+#messages li .timestamp{float:right}
+#msgform{position:fixed;left:0;bottom:0;padding-right:20px;padding-left:20px}
+#msgform, .input-append{margin-bottom:0}
+#msgform textarea{padding:0 .5%;width:79%;height:45px}
+#msgform button{width:21%;height:45px}

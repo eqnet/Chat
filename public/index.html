@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+		<title>Socket.IO chat-example</title>
+		<link rel="stylesheet" href="/css/bootstrap.min.css">
+		<link rel="stylesheet" href="/css/chosen.css">
+		<link rel="stylesheet" href="/css/site.css">
+	</head>
+<body>
+<div class="container-fluid">
+	<div class="row-fluid">
+		<div id="online" class="span12">
+			<p><span id="usercount"></span> <span id="userregistered"></span></p>
+		</div>
+	</div>
+	<div class="row-fluid">
+		<div id="controlform" class="form-inline span12">
+			<input id="nickname" type="text" maxlength="15" tabindex="1" placeholder="Nickname" autocomplete="off">
+			<div id="controlbuttons">
+				<button class="btn" onclick="clearMessages()" tabindex="5">Clear</button>
+				<button class="btn" onclick="resetForm()" tabindex="6">Reset</button>
+			</div>
+			<select id="users" class="hide chzn-select" multiple size="4" tabindex="2" data-placeholder=" ">
+				<option value="All Users" selected>All Users</option>
+			</select>
+		</div>
+	</div>
+	<div class="row-fluid">
+		<div id="msgcontainer" class="span12">
+			<ul id="messages"></ul>
+		</div>
+	</div>
+	<div class="row-fluid">
+		<div class="input-append span12">
+			<form id="msgform" class="form-inline span12" action="">
+				<textarea id="msg" tabindex="3"></textarea>
+				<button class="btn btn-primary" tabindex="4">Send</button>
+			</form>
+		</div>
+	</div>
+</div>
+
+<script src="/js/jquery-1.8.2.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/bootbox.min.js"></script>
+<script src="/js/chosen.jquery.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+var allusers = true;
+var currentUsers;
+
+$(document).ready(function() {
+	$(".chzn-select").chosen();
+	resizeMsgContainer();
+	
+	var socket = io();
+	$('#nickname').val('').focus();
+	$('#msg').val('');
+	
+	$('#nickname').on('change', function() {
+		socket.emit('add user', $('#nickname').val());
+	});
+	
+	socket.on('reconnect', function() {
+		socket.emit('add user', $('#nickname').val());
+	});
+
+	$('#msgform').submit(function() {
+		if ($('#nickname').val() !== '') {
+			if ($('#users').val() !== null) {
+				if ($('#msg').val() !== '') {
+					if (currentUsers.sort().join('|') == $('#users').val().sort().join('|')) {
+						socket.emit('chat message', $('#users').val().join('|'), $('#msg').val().replace(/^[\r\n]+|\.|[\r\n]+$/g, '').replace(/\n/g, '<br>'));
+						$('#msg').val('').focus();
+						return false;
+					} else {
+						bootbox.confirm('The selected user/s have changed. Do you want to continue?', function(confirmed) {
+							if (confirmed) {
+								socket.emit('chat message', $('#users').val().join('|'), $('#msg').val().replace(/^[\r\n]+|\.|[\r\n]+$/g, '').replace(/\n/g, '<br>'));
+								$('#msg').val('').focus();
+							}
+						});
+						return false
+					}
+				} else {
+					bootbox.alert('You must enter a message.', function() {
+						$('#msg').focus();
+					});
+					return false;
+				}
+			} else {
+				bootbox.alert('You must select a user.', function() {
+					$('#users').focus();
+				});
+				return false;
+			}
+		} else {
+			bootbox.alert('You must enter a nickname.', function() {
+				$('#nickname').focus();
+			});
+			return false;
+		}
+	});
+
+	socket.on('user count', function(userCount) {
+		if (userCount == 1) {
+			$('#usercount').html('There is <b>'+ userCount +'</b> user currently connected.');
+		} else {
+			$('#usercount').html('There are <b>'+ userCount +'</b> users currently connected.');
+		}
+	});
+
+	socket.on('update users', function (users) {
+		var selectedusers = $('#users').val();
+		$('.chzn-choices .search-choice').remove();
+		$('#users').html('').append('<option value="All Users">All Users</option>');
+
+		var nickname = $('#nickname').val();
+		var i = 0;
+		var sortedUsers = new Array();
+		for (key in users) {
+			if (key !== nickname){
+				sortedUsers[i] = new Array(key, users[key]);
+				i++;
+			}
+		}
+		
+		if (i == 1) {
+			$('#userregistered').html('<b>'+ i +'</b> is online.');
+		} else {
+			$('#userregistered').html('<b>'+ i +'</b> are online.');
+		}
+		
+		sortedUsers.sort();
+		for (var i=0;i<sortedUsers.length;i++) {
+			$('#users').append('<option value="' + sortedUsers[i][1] + '">' + htmlEncode(sortedUsers[i][0]) + '</option>');
+		}
+		
+		$('#users').val(selectedusers);
+		
+		if ($('#users').val() == null) {
+			$('#users').val('All Users');
+			allusers = true;
+		}
+		
+		$('#users').trigger('liszt:updated');
+	});
+
+	socket.on('invalid user', function(msg) {
+		bootbox.alert(msg, function(){
+			$('#nickname').val('').focus();
+		});
+	});
+
+	socket.on('chat message', function(id, user, msg) {
+		if ($('#nickname').val()) {
+			msg = htmlEncode(msg).replace(/&#60;br&#62;/g, '<br>');
+			var html = '';
+			if (id !== '') {
+				html = '<span class="user"><a href="javascript:selectUser(\''+ id +'\')">'+ htmlEncode(user) +'</a>:</span><span class="user timestamp">'+ timeStamp() +'</span><table><tr><td class="msgline">o</td><td class="msg">'+ msg +'</td></tr></table>';
+			} else {
+				html = '<span class="user">'+ htmlEncode(user) +':</span><span class="user timestamp">'+ timeStamp() +'</span><table><tr><td class="msgline">o</td><td class="msg">'+ msg +'</td></tr></table>';
+			}
+			$('#messages').append($('<li class="img-rounded">').html(html));
+			divScrollTop('msgcontainer');
+		}
+	});
+	
+	$('#users').on('change', function() {
+		if ($('#users').val() == null) {
+			$('#users').val('All Users');
+			$('#users').trigger('liszt:updated');
+			allusers = true;
+			$('#msg').focus();
+		} else if (allusers == true && allusers == $('#users option[value="All Users"]').prop('selected')) {
+			$('#users option[value="All Users"]').prop('selected', false);
+			$('#users').trigger('liszt:updated');
+			allusers = false;
+		} else if (allusers == false && $('#users option[value="All Users"]').prop('selected') == true) {
+			$('#users').val('All Users');
+			$('#users').trigger('liszt:updated');
+			allusers = true
+			$('#msg').focus();
+		}
+	});
+	
+	$('#msg').on('focus', function() {
+		currentUsers = $('#users').val();
+	});
+	
+	$('#msg').on('keyup mouseup blur', function() {
+		checkMaxLength(this, 200);
+	});
+	
+	$(window).resize(function() {
+		resizeMsgContainer();
+		divScrollTop('msgcontainer');
+	});
+});
+
+function resizeMsgContainer() {
+	$('#msgcontainer').css('height', ($(window).height() - parseInt($('body').css('padding-top')) - $('#online').height() - $('#controlform').height() - $('#msgform').height() - 25));
+}
+
+function selectUser(user) {
+	if ($('#users').find('option[value='+ user +']').length) {
+		$('.chzn-choices .search-choice').remove();
+		$('#users').val(user);
+		$('#users').trigger('liszt:updated');
+		allusers = false;
+		$('#msg').focus();
+	} else {
+		bootbox.alert('This user has left the chat session.');
+	}
+}
+
+function divScrollTop(div) {
+	var oDiv = document.getElementById(div);
+	oDiv.scrollTop = oDiv.scrollHeight;
+}
+
+function clearMessages() {
+	bootbox.confirm('This will remove your chat history. Do you want to continue?', function(confirmed) {
+		if (confirmed) {
+			$('#messages').html('');
+			$('#msg').focus();
+		}
+	});
+}
+
+function resetForm() {
+	location.reload(true);
+}
+
+function checkMaxLength(obj,maxlength){
+	if (obj.value.length > maxlength) {
+		obj.value = obj.value.substring(0,maxlength);
+	}
+}
+
+function timeStamp() {
+	var now = new Date();
+	var time = [('0'+ now.getHours()).slice(-2), ('0'+ now.getMinutes()).slice(-2)];
+	return time.join(':');
+}
+
+function htmlEncode(str) {
+	return String(str)
+	.replace(/&/g, '&#38;')
+	.replace(/"/g, '&#34;')
+	.replace(/'/g, '&#39;')
+	.replace(/\//g, '&#47;')
+	.replace(/</g, '&#60;')
+	.replace(/>/g, '&#62;');
+}
+
+function htmlDecode(str) {
+	return String(str)
+	.replace(/&#34;/g, '"')
+	.replace(/&#39;/g, "'")
+	.replace(/&#47;/g, '/')
+	.replace(/&#60;/g, '<')
+	.replace(/&#62;/g, '>')
+	.replace(/&#38;/g, '&');
+}
+</script>
+</body>
+</html>

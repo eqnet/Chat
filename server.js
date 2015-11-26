@@ -1,159 +1,213 @@
-#!/bin/env node
-//  OpenShift sample Node application
 var express = require('express');
-var fs      = require('fs');
+var app = express();
+var server = app.listen(83);
+var io = require('socket.io').listen(server);
+var mongodb = require('mongodb');
 
+var db;
 
-/**
- *  Define the sample application.
- */
-var SampleApp = function() {
+mongodb.MongoClient.connect('mongodb://node:Adcp$1234@localhost:27017/node', function(err, database) {
+	if(err) throw err;
 
-    //  Scope.
-    var self = this;
+	db = database;
+});
 
+app.use(express.static('public'));
 
-    /*  ================================================================  */
-    /*  Helper functions.                                                 */
-    /*  ================================================================  */
+app.get('/', function(req, res) {
+	
+});
 
-    /**
-     *  Set up server IP address and port # using env variables/defaults.
-     */
-    self.setupVariables = function() {
-        //  Set the environment variables we need.
-        self.ipaddress = process.env.OPENSHIFT_NODEJS_IP;
-        self.port      = process.env.OPENSHIFT_NODEJS_PORT || 8080;
+var userCount = 0;
+var users = {};
 
-        if (typeof self.ipaddress === "undefined") {
-            //  Log errors on OpenShift but continue w/ 127.0.0.1 - this
-            //  allows us to run/test the app locally.
-            console.warn('No OPENSHIFT_NODEJS_IP var, using 127.0.0.1');
-            self.ipaddress = "127.0.0.1";
-        };
-    };
+io.on('connection', function(socket) {
+	userCount++;
+	io.emit(socket.id).emit('user count', userCount);
+	io.to(socket.id).emit('update users', users);
+	
+	socket.on('add user', function(msg) {
+		if (msg !== '' && msg.toLowerCase() !== 'all users') {
+			if (users[msg]) {
+				if (users[msg] !== socket.id) {
+					io.to(socket.id).emit('invalid user', 'This nickname already exists. Please choose a different nickname.');
+				}
+			} else {
+				if (users[socket.nickname]) {
+					delete users[socket.nickname];
+					socket.broadcast.emit('chat message', socket.id, socket.nickname, 'I have changed my nickname to ' + msg);
+					
+					updateUser(socket.nickname, msg);
+					
+					socket.nickname = msg;
+					users[socket.nickname] = socket.id;
+				} else {
+					socket.nickname = msg;
+					users[socket.nickname] = socket.id;
+					socket.broadcast.emit('chat message', socket.id, socket.nickname, socket.nickname +' has joined the chat session');
+					
+					userConnected(msg);
+					//createUser(msg);
+				}
+				
+				updateUsers();
+			}
+		} else {
+			io.to(socket.id).emit('invalid user', 'Invalid nickname.');
+		}
+	});
+	
+	socket.on('chat message', function(user, msg) {
+		var timeSinceLastMsg = (new Date().getTime() - new Date(socket.lastMsgDate).getTime()) / 1000;
+		socket.lastMsgDate = new Date();
+		
+		if (timeSinceLastMsg < 3) { //Set to 1 after testing
+			socket.broadcast.emit('chat message', '', 'Admin', socket.nickname +' is being removed from the chat session');
+			socket.end();
+			return;
+		}
+		
+		io.to(socket.id).emit('chat message', '', socket.nickname, msg);
+		
+		var msgUsers = [];
+		
+		if (user == 'All Users') {
+			socket.broadcast.emit('chat message', socket.id, socket.nickname, msg);
+			
+			for (var key in users) {
+				msgUsers.push(key);
+			}
+		} else {
+			var chatUsers = user.split('|');
+			for (var i=0;i<chatUsers.length;i++) {
+				io.to(chatUsers[i]).emit('chat message', socket.id, socket.nickname, msg);
+				msgUsers.push(io.sockets.connected[chatUsers[i]].nickname);
+			}
+		}
+		
+		getMsgUsers(msgUsers, function(mongodbUsers) {
+			msgSent(socket.nickname, mongodbUsers, msg);
+		});
+	});
 
+	socket.on('disconnect', function() {
+		userCount--;
+		delete users[socket.nickname];
+		socket.broadcast.emit('user count', userCount);
+		if (socket.nickname) {
+			socket.broadcast.emit('chat message', '', 'Admin', socket.nickname +' has left the chat session');
+		}
+		
+		updateUsers();
+	});
 
-    /**
-     *  Populate the cache.
-     */
-    self.populateCache = function() {
-        if (typeof self.zcache === "undefined") {
-            self.zcache = { 'index.html': '' };
-        }
+	function updateUsers() {
+		io.emit('update users', users);
+	}
+});
 
-        //  Local cache for static content.
-        self.zcache['index.html'] = fs.readFileSync('./index.html');
-    };
+console.log('listening on port:83');
 
+var getMsgUsers = function(msgUsers, callback) {
+	db.collection('users').find({"nickname":{$in:msgUsers}}, {_id:1}).toArray(function(err, rows) {
+		if(err) throw err;
 
-    /**
-     *  Retrieve entry (content) from cache.
-     *  @param {string} key  Key identifying content to retrieve from cache.
-     */
-    self.cache_get = function(key) { return self.zcache[key]; };
+		callback(rows);
+	});
+}
 
+var getMsgSender = function(nickname, callback) {
+	db.collection('users').find({"nickname":nickname}, {_id:1}).toArray(function(err, rows) {
+		if(err) throw err;
 
-    /**
-     *  terminator === the termination handler
-     *  Terminate server on receipt of the specified signal.
-     *  @param {string} sig  Signal to terminate on.
-     */
-    self.terminator = function(sig){
-        if (typeof sig === "string") {
-           console.log('%s: Received %s - terminating sample app ...',
-                       Date(Date.now()), sig);
-           process.exit(1);
-        }
-        console.log('%s: Node server stopped.', Date(Date.now()) );
-    };
+		callback(rows[0]);
+	});
+}
 
+function createUser(nickname) {
+	db.collection('users').insert({nickname:nickname}, function(err, rows) {
+		if(err) throw err;
+	});
+}
 
-    /**
-     *  Setup termination handlers (for exit and a list of signals).
-     */
-    self.setupTerminationHandlers = function(){
-        //  Process on exit and signals.
-        process.on('exit', function() { self.terminator(); });
+function updateUser(nickname, newNickname) {
+	db.collection('users').update({nickname:nickname},{$set:{nickname:newNickname}}, function(err, count) {
+		if(err) throw err;
+	});
+}
 
-        // Removed 'SIGPIPE' from the list - bugz 852598.
-        ['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGTRAP', 'SIGABRT',
-         'SIGBUS', 'SIGFPE', 'SIGUSR1', 'SIGSEGV', 'SIGUSR2', 'SIGTERM'
-        ].forEach(function(element, index, array) {
-            process.on(element, function() { self.terminator(element); });
-        });
-    };
+function userConnected(nickname) {
+	db.collection('users').count({nickname:nickname}, function(err, count) {
+		if (count == 0) {
+			createUser(nickname);
+		}
+	});
+}
 
+function msgSent(nickname, users, msg) {
+	var mongodbUsers = [];
+	for (var i=0;i<users.length;i++) {
+		mongodbUsers.push(users[i]._id);
+	}
+	
+	db.collection('users').update(
+		{"nickname":nickname},
+		{
+			$inc:{"sentMsgs.count":1},
+			$set:{"sentMsgs.lastDate":new Date()},
+			$push:{
+				"sentMsgs.msgs":{
+					"date":new Date(),
+					"users":mongodbUsers,
+					"msg":msg
+				}
+			}
+		},	function(err, count) {
+				if(err) throw err;
+				
+				getMsgSender(nickname, function(mongodbUser) {
+					msgReceived(mongodbUser, users, msg);
+				});
+			}
+	);
+}
 
-    /*  ================================================================  */
-    /*  App server functions (main app logic here).                       */
-    /*  ================================================================  */
+function msgReceived(mongodbUser, users, msg) {
+	var msgDate = new Date();
+	var user = {};
+	
+	for (var i=0;i<users.length;i++) {
+		user = users[i];
+		db.collection('users').update(
+			{"_id":user._id},
+			{
+				$inc:{"receivedMsgs.count":1},
+				$set:{"receivedMsgs.lastDate":msgDate},
+				$push:{
+					"receivedMsgs.msgs":{
+						"date":msgDate,
+						"user":mongodbUser._id,
+						"msg":msg
+					}
+				}
+			},	function(err, count) {
+					if(err) throw err;
+				}
+		);
+	}
+}
+/*
+db.collection('users').count({nickname:msg}, function(err, count) {
+	if (count > 0) {
+		db.collection('users').update({nickname:msg},{$inc:{msg_count:1}, $set:{last_msg:new Date()}}, function(err, count) {
+			if(err) throw err;
+		});
+	} else {
+		db.collection('users').insert({nickname:msg, msg_count:1, last_msg:new Date()}, function(err, rows) {
+			if(err) throw err;
+		});
+	}
+});
+*/
 
-    /**
-     *  Create the routing table entries + handlers for the application.
-     */
-    self.createRoutes = function() {
-        self.routes = { };
-
-        self.routes['/asciimo'] = function(req, res) {
-            var link = "http://i.imgur.com/kmbjB.png";
-            res.send("<html><body><img src='" + link + "'></body></html>");
-        };
-
-        self.routes['/'] = function(req, res) {
-            res.setHeader('Content-Type', 'text/html');
-            res.send(self.cache_get('index.html') );
-        };
-    };
-
-
-    /**
-     *  Initialize the server (express) and create the routes and register
-     *  the handlers.
-     */
-    self.initializeServer = function() {
-        self.createRoutes();
-        self.app = express.createServer();
-
-        //  Add handlers for the app (from the routes).
-        for (var r in self.routes) {
-            self.app.get(r, self.routes[r]);
-        }
-    };
-
-
-    /**
-     *  Initializes the sample application.
-     */
-    self.initialize = function() {
-        self.setupVariables();
-        self.populateCache();
-        self.setupTerminationHandlers();
-
-        // Create the express server and routes.
-        self.initializeServer();
-    };
-
-
-    /**
-     *  Start the server (starts up the sample application).
-     */
-    self.start = function() {
-        //  Start the app on the specific interface (and port).
-        self.app.listen(self.port, self.ipaddress, function() {
-            console.log('%s: Node server started on %s:%d ...',
-                        Date(Date.now() ), self.ipaddress, self.port);
-        });
-    };
-
-};   /*  Sample Application.  */
-
-
-
-/**
- *  main():  Main code.
- */
-var zapp = new SampleApp();
-zapp.initialize();
-zapp.start();
 
