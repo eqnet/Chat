@@ -2,6 +2,7 @@
 	"name": "mongodb-chat-example",
 	"version": "0.0.1",
 	"description": "my first mongodb socket.io app",
+	"main": "server.js",
 	"dependencies": {
 		"express": "^4.12.3",
 		 "mongodb": "^2.0.28",
