@@ -1,6 +1,6 @@
 var express = require('express');
 var app = express();
-var server = app.listen(80);
+var server = app.listen(8080);
 var io = require('socket.io').listen(server);
 var MongoClient = require('mongodb').MongoClient;
 
