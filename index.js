@@ -1,15 +1,17 @@
 var express = require('express');
 var app = express();
-var server = app;
+var server = app.listen(80);
 var io = require('socket.io').listen(server);
-var mongodb = require('mongodb');
+var MongoClient = require('mongodb').MongoClient;
 
 var db;
-
-mongodb.MongoClient.connect('mongodb://node:Adcp$1234@localhost:27017/node', function(err, database) {
-	if(err) throw err;
-
-	db = database;
+var uri = "mongodb+srv://eqnet:Eqnet-123@cluster0-2ffwi.mongodb.net/node?retryWrites=true";
+MongoClient.connect(uri, {useNewUrlParser: true}, function(err, client) {
+   if (err) {
+	   console.log('Error conecting to MongoDB:' + err)
+   } else {
+	   db = client.db("node");
+   }
 });
 
 app.use(express.static('public'));
@@ -106,7 +108,7 @@ io.on('connection', function(socket) {
 	}
 });
 
-console.log('listening on port:83');
+console.log('listening on port:80');
 
 var getMsgUsers = function(msgUsers, callback) {
 	db.collection('users').find({"nickname":{$in:msgUsers}}, {_id:1}).toArray(function(err, rows) {
@@ -137,7 +139,7 @@ function updateUser(nickname, newNickname) {
 }
 
 function userConnected(nickname) {
-	db.collection('users').count({nickname:nickname}, function(err, count) {
+	db.collection('users').countDocuments({nickname:nickname}, function(err, count) {
 		if (count == 0) {
 			createUser(nickname);
 		}
@@ -197,12 +199,14 @@ function msgReceived(mongodbUser, users, msg) {
 	}
 }
 
+/*
 var server_port = process.env.OPENSHIFT_NODEJS_PORT || 8080;
 var server_ip_address = process.env.OPENSHIFT_NODEJS_IP || '127.0.0.1';
 
 server.listen(server_port, server_ip_address, function () {
 	console.log( "Listening on " + server_ip_address + ", server_port " + port );
 });
+*/
 /*
 db.collection('users').count({nickname:msg}, function(err, count) {
 	if (count > 0) {
