@@ -108,7 +108,7 @@ io.on('connection', function(socket) {
 	}
 });
 
-console.log('listening on port:80');
+console.log('listening on port:8080');
 
 var getMsgUsers = function(msgUsers, callback) {
 	db.collection('users').find({"nickname":{$in:msgUsers}}, {_id:1}).toArray(function(err, rows) {
