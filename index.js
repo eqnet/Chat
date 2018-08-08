@@ -5,7 +5,7 @@ var io = require('socket.io').listen(server);
 var MongoClient = require('mongodb').MongoClient;
 
 var db;
-var uri = 'mongodb://dXNlck82Mg==:b3kyNG1sUkdtVTR0MXg3UQ==@localhost:27017/node';
+var uri = 'mongodb://userO62:oy24mlRGmU4t1x7Q@mongodb/node';
 MongoClient.connect(uri, {useNewUrlParser:true}, function(err, client) {
    if (err) {
 	   console.log('Error conecting to MongoDB:' + err)
