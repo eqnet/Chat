@@ -4,11 +4,9 @@ var server = app.listen(8080);
 var io = require('socket.io').listen(server);
 var MongoClient = require('mongodb').MongoClient;
 
-console.log('OPENSHIFT_MONGODB_DB_HOST' + process.env.OPENSHIFT_MONGODB_DB_HOST);
-console.log('OPENSHIFT_MONGODB_DB_USERNAME' + process.env.OPENSHIFT_MONGODB_DB_USERNAME);
-console.log('OPENSHIFT_MONGODB_DB_PASSWORD' + process.env.OPENSHIFT_MONGODB_DB_PASSWORD);
-console.log('OPENSHIFT_MONGODB_DB_HOST' + process.env.OPENSHIFT_MONGODB_DB_HOST);
-console.log('OPENSHIFT_MONGODB_DB_PORT' + process.env.OPENSHIFT_MONGODB_DB_PORT);
+console.log('MONGODB_USER:' + process.env.MONGODB_USER);
+console.log('MONGODB_PASSWORD:' + process.env.MONGODB_PASSWORD);
+console.log('MONGODB_DATABASE:' + process.env.MONGODB_DATABASE);
 
 var db;
 var uri = 'mongodb://node:node$1234@mongodb:27017/node';
