@@ -4,6 +4,8 @@ var server = app.listen(8080);
 var io = require('socket.io').listen(server);
 var MongoClient = require('mongodb').MongoClient;
 
+console.log(process.env.OPENSHIFT_MONGODB_DB_URL);
+
 var db;
 var uri = process.env.OPENSHIFT_MONGODB_DB_URL;
 MongoClient.connect(uri, {useNewUrlParser:true}, function(err, client) {
