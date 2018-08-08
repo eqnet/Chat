@@ -7,7 +7,7 @@ var MongoClient = require('mongodb').MongoClient;
 console.log(process.env.OPENSHIFT_MONGODB_DB_URL);
 
 var db;
-var uri = process.env.MONGODB_USER;
+var uri = MONGODB_USER;
 MongoClient.connect(uri, {useNewUrlParser:true}, function(err, client) {
    if (err) {
 	   console.log('Error conecting to MongoDB:' + err)
