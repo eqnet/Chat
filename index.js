@@ -9,7 +9,7 @@ console.log('MONGODB_PASSWORD:' + process.env.MONGODB_PASSWORD);
 console.log('MONGODB_DATABASE:' + process.env.MONGODB_DATABASE);
 
 var db;
-var uri = 'mongodb://node:node$1234@mongodb:27017/node';
+var uri = 'mongodb://'+ process.env.MONGODB_USER +':'+ process.env.MONGODB_PASSWORD +'@mongodb:27017/node';
 MongoClient.connect(uri, {useNewUrlParser:true}, function(err, client) {
    if (err) {
 	   console.log('Error conecting to MongoDB:' + err)
