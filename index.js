@@ -4,24 +4,9 @@ var server = app.listen(8080);
 var io = require('socket.io').listen(server);
 var MongoClient = require('mongodb').MongoClient;
 
-
-const https = require('https');
-
-https.get('https://uateservices.adcp.ae/search/email.esp', (res) => {
-  console.log('statusCode:', res.statusCode);
-  console.log('headers:', res.headers);
-
-  res.on('data', (d) => {
-    process.stdout.write(d);
-  });
-
-}).on('error', (e) => {
-  console.error(e);
-});
-
 var db;
-var uri = "mongodb+srv://eqnet:Eqnet-123@cluster0-2ffwi.mongodb.net/node?retryWrites=true";
-MongoClient.connect(uri, {useNewUrlParser: true}, function(err, client) {
+var uri = "mongodb://userO62:oy24mlRGmU4t1x7Q@mongodb/node";
+MongoClient.connect(uri, function(err, client) {
    if (err) {
 	   console.log('Error conecting to MongoDB:' + err)
    } else {
