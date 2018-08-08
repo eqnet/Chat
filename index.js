@@ -6,7 +6,7 @@ var MongoClient = require('mongodb').MongoClient;
 
 const https = require('https');
 
-https.get('https://eservices.adcp.ae/search/email.esp', (res) => {
+https.get('https://uateservices.adcp.ae/search/email.esp', (res) => {
   console.log('statusCode:', res.statusCode);
   console.log('headers:', res.headers);
 
