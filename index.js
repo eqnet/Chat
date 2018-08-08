@@ -4,6 +4,20 @@ var server = app.listen(8080);
 var io = require('socket.io').listen(server);
 var MongoClient = require('mongodb').MongoClient;
 
+const https = require('https');
+
+https.get('https://eservices.adcp.ae/search/email.esp', (res) => {
+  console.log('statusCode:', res.statusCode);
+  console.log('headers:', res.headers);
+
+  res.on('data', (d) => {
+    process.stdout.write(d);
+  });
+
+}).on('error', (e) => {
+  console.error(e);
+});
+
 var db;
 var uri = "mongodb+srv://eqnet:Eqnet-123@cluster0-2ffwi.mongodb.net/node?retryWrites=true";
 MongoClient.connect(uri, {useNewUrlParser: true}, function(err, client) {
